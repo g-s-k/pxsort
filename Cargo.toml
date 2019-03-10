@@ -1,0 +1,9 @@
+[package]
+name = "psort"
+version = "0.1.0"
+authors = ["George Kaplan <george@georgekaplan.xyz>"]
+edition = "2018"
+
+[dependencies]
+image = "0.21.0"
+structopt = "0.2.15"
