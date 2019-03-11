@@ -64,6 +64,9 @@ struct Cli {
         )
     )]
     function: SortHeuristic,
+    /// Reverse the sort direction
+    #[structopt(short)]
+    reverse: bool,
 }
 
 fn main() -> Result<(), ImageError> {
@@ -85,6 +88,7 @@ fn main() -> Result<(), ImageError> {
 
                 let mut ctr = 0;
                 while ctr < w {
+                    // find the end of the current "good" sequence
                     let numel = row[ctr..]
                         .iter()
                         .take_while(|p| {
@@ -92,8 +96,19 @@ fn main() -> Result<(), ImageError> {
                             l >= cli.minimum && l <= cli.maximum
                         })
                         .count();
-                    row[ctr..ctr + numel].sort_unstable_by(|l, r| sort_fn(l).cmp(&sort_fn(r)));
+
+                    // sort
+                    row[ctr..ctr + numel].sort_unstable_by(|l, r| {
+                        if cli.reverse {
+                            sort_fn(r).cmp(&sort_fn(l))
+                        } else {
+                            sort_fn(l).cmp(&sort_fn(r))
+                        }
+                    });
+
                     ctr += numel;
+
+                    // continue until another value in the right range appears
                     ctr += row[ctr..]
                         .iter()
                         .take_while(|p| {
