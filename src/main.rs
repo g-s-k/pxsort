@@ -6,10 +6,45 @@ use structopt::{
     StructOpt,
 };
 
+fn pixel_max(Rgba { data, .. }: &Rgba<u8>) -> u8 {
+    data[..3].iter().max().cloned().unwrap_or_default()
+}
+
+fn pixel_min(Rgba { data, .. }: &Rgba<u8>) -> u8 {
+    data[..3].iter().min().cloned().unwrap_or_default()
+}
+
+fn pixel_chroma(pixel: &Rgba<u8>) -> u8 {
+    pixel_max(pixel) - pixel_min(pixel)
+}
+
+fn pixel_hue(pixel: &Rgba<u8>) -> u8 {
+    let c = pixel_chroma(pixel);
+
+    if c == 0 {
+        return 0;
+    }
+
+    let Rgba { data, .. } = pixel;
+
+    match data[..3].iter().enumerate().max_by_key(|&(_, e)| e) {
+        Some((0, _)) => (data[1] as i16 - data[2] as i16).abs() as u8 / c * 43,
+        Some((1, _)) => (data[2] as i16 - data[0] as i16).abs() as u8 / c * 43 + 85,
+        Some((2, _)) => (data[0] as i16 - data[1] as i16).abs() as u8 / c * 43 + 171,
+        _ => 0,
+    }
+}
+
 arg_enum! {
     enum SortHeuristic {
         Luma,
         Brightness,
+        Max,
+        Min,
+        Chroma,
+        Hue,
+        Saturation,
+        Value,
         Red,
         Blue,
         Green,
@@ -22,6 +57,17 @@ impl SortHeuristic {
             SortHeuristic::Red => Box::new(|Rgba { data, .. }| data[0]),
             SortHeuristic::Green => Box::new(|Rgba { data, .. }| data[1]),
             SortHeuristic::Blue => Box::new(|Rgba { data, .. }| data[2]),
+            SortHeuristic::Max => Box::new(pixel_max),
+            SortHeuristic::Min => Box::new(pixel_min),
+            SortHeuristic::Chroma => Box::new(pixel_chroma),
+            SortHeuristic::Hue => Box::new(pixel_hue),
+            SortHeuristic::Saturation => Box::new(|p| {
+                match pixel_max(p) {
+                    0 => 0,
+                    v => pixel_chroma(p) / v,
+                }
+            }),
+            SortHeuristic::Value => Box::new(pixel_max),
             SortHeuristic::Brightness => Box::new(|Rgba { data, .. }| {
                 data[0] / 3
                     + data[1] / 3
