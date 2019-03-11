@@ -67,12 +67,19 @@ struct Cli {
     /// Reverse the sort direction
     #[structopt(short)]
     reverse: bool,
+    /// Sort vertically instead of horizontally
+    #[structopt(short)]
+    vertical: bool,
 }
 
 fn main() -> Result<(), ImageError> {
     let cli = Cli::from_args();
 
     let mut img = image::open(&cli.file)?;
+
+    if cli.vertical {
+        img = img.rotate90();
+    }
 
     match &mut img {
         DynamicImage::ImageRgb8(rgb) => {
@@ -124,6 +131,10 @@ fn main() -> Result<(), ImageError> {
             }
         }
         _ => (),
+    }
+
+    if cli.vertical {
+        img = img.rotate270();
     }
 
     if let Some(p) = cli.output {
