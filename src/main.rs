@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use image::{DynamicImage, ImageError, Rgba};
+use indicatif::ProgressBar;
 use structopt::{
     clap::{_clap_count_exprs, arg_enum},
     StructOpt,
@@ -61,11 +62,9 @@ impl SortHeuristic {
             SortHeuristic::Min => Box::new(pixel_min),
             SortHeuristic::Chroma => Box::new(pixel_chroma),
             SortHeuristic::Hue => Box::new(pixel_hue),
-            SortHeuristic::Saturation => Box::new(|p| {
-                match pixel_max(p) {
-                    0 => 0,
-                    v => pixel_chroma(p) / v,
-                }
+            SortHeuristic::Saturation => Box::new(|p| match pixel_max(p) {
+                0 => 0,
+                v => pixel_chroma(p) / v,
             }),
             SortHeuristic::Value => Box::new(pixel_max),
             SortHeuristic::Brightness => Box::new(|Rgba { data, .. }| {
@@ -124,6 +123,7 @@ struct Cli {
 fn main() -> Result<(), ImageError> {
     let cli = Cli::from_args();
 
+    eprintln!("Opening image at {:?}", cli.file);
     let mut img = image::open(&cli.file)?;
 
     if cli.vertical {
@@ -131,19 +131,23 @@ fn main() -> Result<(), ImageError> {
     }
 
     let mut rgba = img.to_rgba();
+    let (w, h) = rgba.dimensions();
 
-    let w = rgba.width() as usize;
+    eprintln!("Sorting {}:", if cli.vertical { "columns" } else { "rows" });
+    let prog = ProgressBar::new(h as u64);
+    prog.set_draw_delta(h as u64 / 50);
+
     for (idx_y, row) in rgba
         .clone()
         .pixels_mut()
         .collect::<Vec<_>>()
-        .chunks_mut(w)
+        .chunks_mut(w as usize)
         .enumerate()
     {
         let sort_fn = cli.function.func();
 
         let mut ctr = 0;
-        while ctr < w {
+        while ctr < w as usize {
             // find the end of the current "good" sequence
             let numel = row[ctr..]
                 .iter()
@@ -177,7 +181,11 @@ fn main() -> Result<(), ImageError> {
         for (idx_x, px) in row.iter().enumerate() {
             rgba.put_pixel(idx_x as u32, idx_y as u32, **px);
         }
+
+        prog.inc(1);
     }
+
+    prog.finish_with_message("Done sorting!");
 
     let mut img_out = DynamicImage::ImageRgba8(rgba);
 
@@ -185,25 +193,28 @@ fn main() -> Result<(), ImageError> {
         img_out = img_out.rotate270();
     }
 
-    if let Some(p) = cli.output {
-        img_out.save(p)?;
+    let file_out = if let Some(p) = cli.output {
+        p
     } else {
         match (
             cli.file.parent(),
             cli.file.file_stem(),
             cli.file.extension(),
         ) {
-            (None, _, _) | (_, None, _) | (_, _, None) => (),
+            (None, _, _) | (_, None, _) | (_, _, None) => panic!("Invalid filename"),
             (Some(p), Some(b), Some(e)) => {
                 let mut fname = b.to_owned();
                 fname.push("_1.");
                 fname.push(e);
                 let mut pth = p.to_owned();
                 pth.push(fname);
-                img_out.save(pth)?;
+                pth
             }
         }
-    }
+    };
+
+    eprintln!("Saving file to {:?}", file_out);
+    img_out.save(file_out)?;
 
     Ok(())
 }

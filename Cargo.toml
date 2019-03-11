@@ -11,3 +11,4 @@ readme = "./README.md"
 [dependencies]
 image = "0.21.0"
 structopt = "0.2.15"
+indicatif = "0.11.0"
