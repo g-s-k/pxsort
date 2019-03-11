@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use image::{DynamicImage, ImageError};
+use image::{DynamicImage, ImageError, Rgb};
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -9,6 +9,15 @@ struct Cli {
     file: PathBuf,
     #[structopt(short, parse(try_from_str))]
     output: Option<PathBuf>,
+    #[structopt(short, default_value = "0")]
+    minimum: u8,
+    #[structopt(short = "x", default_value = "255")]
+    maximum: u8,
+}
+
+fn luma(Rgb { data, .. }: &Rgb<u8>) -> u8 {
+    // https://stackoverflow.com/a/596241
+    ((data[0] as u16 * 2 + data[1] as u16 + data[2] as u16 * 4) >> 3) as u8
 }
 
 fn main() -> Result<(), ImageError> {
@@ -18,15 +27,33 @@ fn main() -> Result<(), ImageError> {
 
     match &mut img {
         DynamicImage::ImageRgb8(rgb) => {
-            let w = rgb.width();
+            let w = rgb.width() as usize;
             for (idx_y, row) in rgb
                 .clone()
                 .pixels_mut()
                 .collect::<Vec<_>>()
-                .chunks_mut(w as usize)
+                .chunks_mut(w)
                 .enumerate()
             {
-                row.sort_by(|left, right| left.data[0].cmp(&right.data[0]));
+                let mut ctr = 0;
+                while ctr < w {
+                    let numel = row[ctr..]
+                        .iter()
+                        .take_while(|p| {
+                            let l = luma(p);
+                            l >= cli.minimum && l <= cli.maximum
+                        })
+                        .count();
+                    row[ctr..ctr + numel].sort_unstable_by(|left, right| luma(left).cmp(&luma(right)));
+                    ctr += numel;
+                    ctr += row[ctr..]
+                        .iter()
+                        .take_while(|p| {
+                            let l = luma(p);
+                            l < cli.minimum || l > cli.maximum
+                        })
+                        .count();
+                }
 
                 for (idx_x, px) in row.iter().enumerate() {
                     rgb.put_pixel(idx_x as u32, idx_y as u32, **px);
