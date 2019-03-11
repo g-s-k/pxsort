@@ -81,9 +81,28 @@ impl SortHeuristic {
     }
 }
 
+arg_enum! {
+    enum PathShape {
+        Line,
+        Sine,
+        Ellipse,
+    }
+}
+
+fn check_angle(angle: String) -> Result<(), String> {
+    let ang = angle
+        .parse::<f32>()
+        .map_err(|_| "Could not parse as a number".to_string())?;
+    if ang >= 90.0 || ang <= -90.0 {
+        Err("Rotation angle must be between -90 and +90 degrees".to_string())
+    } else {
+        Ok(())
+    }
+}
+
 #[derive(StructOpt)]
 #[structopt(about = "Sort the pixels in an image")]
-#[structopt(raw(setting = "structopt::clap::AppSettings::ColoredHelp"))]
+#[structopt(raw(global_setting = "structopt::clap::AppSettings::ColoredHelp"))]
 #[structopt(rename_all = "kebab-case")]
 struct Cli {
     /// Input file
@@ -115,12 +134,64 @@ struct Cli {
     /// Sort outside specified range rather than inside
     #[structopt(short)]
     invert: bool,
-    /// Sort vertically instead of horizontally
-    #[structopt(short)]
+    /// Rotate the sort path by 90 degrees
+    #[structopt(short, group = "rotate")]
     vertical: bool,
     /// Don't sort pixels that have zero alpha
     #[structopt(long)]
     mask_alpha: bool,
+    /// Rotate the sort path by a custom angle
+    #[structopt(short, default_value = "0", raw(validator = "check_angle"))]
+    angle: f32,
+    /// Path shape to traverse the image
+    #[structopt(
+        short,
+        long,
+        default_value = "line",
+        raw(
+            case_insensitive = "true",
+            possible_values = "&PathShape::variants()",
+            set = "structopt::clap::ArgSettings::NextLineHelp"
+        )
+    )]
+    path: PathShape,
+}
+
+fn do_sort(cli: &Cli, pixels: &mut [&Rgba<u8>]) {
+    let sort_fn = cli.function.func();
+    let mask_fn = |p: &Rgba<u8>| !(cli.mask_alpha && p.data[3] == 0);
+
+    let mut ctr = 0;
+    while ctr < pixels.len() as usize {
+        // find the end of the current "good" sequence
+        let numel = pixels[ctr..]
+            .iter()
+            .take_while(|p| {
+                let l = sort_fn(p);
+                (l >= cli.minimum && l <= cli.maximum) != cli.invert && mask_fn(p)
+            })
+            .count();
+
+        // sort
+        pixels[ctr..ctr + numel].sort_unstable_by(|l, r| {
+            if cli.reverse {
+                sort_fn(r).cmp(&sort_fn(l))
+            } else {
+                sort_fn(l).cmp(&sort_fn(r))
+            }
+        });
+
+        ctr += numel;
+
+        // continue until another value in the right range appears
+        ctr += pixels[ctr..]
+            .iter()
+            .take_while(|p| {
+                let l = sort_fn(p);
+                (l < cli.minimum || l > cli.maximum) != cli.invert || !mask_fn(p)
+            })
+            .count();
+    }
 }
 
 fn main() -> Result<(), ImageError> {
@@ -137,61 +208,68 @@ fn main() -> Result<(), ImageError> {
     let (w, h) = rgba.dimensions();
 
     let prog = ProgressBar::new(h as u64);
-    prog.set_draw_delta(h as u64 / 50);
-    prog.set_prefix(&format!(
-        "Sorting {}:",
-        if cli.vertical { "columns" } else { "rows" }
-    ));
     prog.set_style(ProgressStyle::default_bar().template("{prefix} {wide_bar} {pos:>4}/{len}"));
-    prog.tick();
 
-    for (idx_y, row) in rgba
-        .clone()
-        .pixels_mut()
-        .collect::<Vec<_>>()
-        .chunks_mut(w as usize)
-        .enumerate()
-    {
-        let sort_fn = cli.function.func();
-        let mask_fn = |p: &Rgba<u8>| !(cli.mask_alpha && p.data[3] == 0);
+    match cli.path {
+        PathShape::Ellipse => unimplemented!(),
+        PathShape::Sine => unimplemented!(),
+        PathShape::Line if cli.angle != 0.0 => {
+            let tan = cli.angle.to_radians().tan();
+            let extra_height = (w as f32 / tan).floor() as i64;
+            let range = if extra_height > 0 {
+                -extra_height..(h as i64)
+            } else {
+                0..(h as i64 - extra_height)
+            };
 
-        let mut ctr = 0;
-        while ctr < w as usize {
-            // find the end of the current "good" sequence
-            let numel = row[ctr..]
-                .iter()
-                .take_while(|p| {
-                    let l = sort_fn(p);
-                    (l >= cli.minimum && l <= cli.maximum) != cli.invert && mask_fn(p)
-                })
-                .count();
+            prog.set_draw_delta((h as u64 + extra_height.abs() as u64) / 50);
+            prog.set_prefix("Sorting rows:");
+            prog.tick();
 
-            // sort
-            row[ctr..ctr + numel].sort_unstable_by(|l, r| {
-                if cli.reverse {
-                    sort_fn(r).cmp(&sort_fn(l))
-                } else {
-                    sort_fn(l).cmp(&sort_fn(r))
+            let rgba_c = rgba.clone();
+            for row_idx in range {
+                let idxes = (0..w)
+                    .into_iter()
+                    .map(|xv| (xv, (xv as f32 * tan + row_idx as f32) as u32))
+                    .filter(|(_, y)| *y > 0 && *y < h)
+                    .collect::<Vec<_>>();
+                let mut pixels = idxes
+                    .iter()
+                    .map(|(x, y)| rgba_c.get_pixel(*x, *y))
+                    .collect::<Vec<_>>();
+                do_sort(&cli, &mut pixels[..]);
+
+                for ((idx_x, idx_y), px) in idxes.iter().zip(pixels.iter()) {
+                    rgba.put_pixel(*idx_x, *idx_y, **px);
                 }
-            });
 
-            ctr += numel;
-
-            // continue until another value in the right range appears
-            ctr += row[ctr..]
-                .iter()
-                .take_while(|p| {
-                    let l = sort_fn(p);
-                    (l < cli.minimum || l > cli.maximum) != cli.invert || !mask_fn(p)
-                })
-                .count();
+                prog.inc(1);
+            }
         }
+        PathShape::Line => {
+            prog.set_draw_delta(h as u64 / 50);
+            prog.set_prefix(&format!(
+                "Sorting {}:",
+                if cli.vertical { "columns" } else { "rows" }
+            ));
+            prog.tick();
 
-        for (idx_x, px) in row.iter().enumerate() {
-            rgba.put_pixel(idx_x as u32, idx_y as u32, **px);
+            for (idx_y, row) in rgba
+                .clone()
+                .pixels()
+                .collect::<Vec<_>>()
+                .chunks_mut(w as usize)
+                .enumerate()
+            {
+                do_sort(&cli, &mut row[..]);
+
+                for (idx_x, px) in row.iter().enumerate() {
+                    rgba.put_pixel(idx_x as u32, idx_y as u32, **px);
+                }
+
+                prog.inc(1);
+            }
         }
-
-        prog.inc(1);
     }
 
     prog.finish_with_message("Done sorting!");
