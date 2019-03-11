@@ -7,6 +7,8 @@ use structopt::{
     StructOpt,
 };
 
+const BUFFER_PIXELS: i64 = 100;
+
 fn pixel_max(Rgba { data, .. }: &Rgba<u8>) -> u8 {
     data[..3].iter().max().cloned().unwrap_or_default()
 }
@@ -155,6 +157,9 @@ struct Cli {
         )
     )]
     path: PathShape,
+    /// Parameters to modify the path
+    #[structopt(long)]
+    params: Vec<String>,
 }
 
 fn do_sort(cli: &Cli, pixels: &mut [&Rgba<u8>]) {
@@ -212,7 +217,71 @@ fn main() -> Result<(), ImageError> {
 
     match cli.path {
         PathShape::Ellipse => unimplemented!(),
-        PathShape::Sine => unimplemented!(),
+        PathShape::Sine => {
+            let amplitude = cli
+                .params
+                .iter()
+                .find(|s| s.starts_with("amp="))
+                .map(|s| &s[4..])
+                .unwrap_or_default()
+                .parse::<f32>()
+                .unwrap_or(50.);
+            let lambda = cli
+                .params
+                .iter()
+                .find(|s| s.starts_with("period="))
+                .map(|s| &s[7..])
+                .unwrap_or_default()
+                .parse::<f32>()
+                .unwrap_or(180. / std::f32::consts::PI);
+            let shift = cli
+                .params
+                .iter()
+                .find(|s| s.starts_with("offset="))
+                .map(|s| &s[7..])
+                .unwrap_or_default()
+                .parse::<f32>()
+                .unwrap_or_default();
+
+            let tan = cli.angle.to_radians().tan();
+            let extra_height = (w as f32 / tan).floor() as i64;
+            let range = if extra_height > 0 {
+                -(extra_height + BUFFER_PIXELS)..(h as i64)
+            } else {
+                0..(h as i64 - extra_height + BUFFER_PIXELS)
+            };
+
+            prog.set_draw_delta((h as u64 + extra_height.abs() as u64) / 50);
+            prog.set_prefix("Sorting rows:");
+            prog.tick();
+
+            let rgba_c = rgba.clone();
+            for row_idx in range {
+                let idxes = (0..w)
+                    .into_iter()
+                    .map(|xv| {
+                        (
+                            xv,
+                            ((xv as f32 * tan + row_idx as f32)
+                                + (xv as f32 / lambda + shift).sin() * amplitude)
+                                as u32,
+                        )
+                    })
+                    .filter(|(_, y)| *y > 0 && *y < h)
+                    .collect::<Vec<_>>();
+                let mut pixels = idxes
+                    .iter()
+                    .map(|(x, y)| rgba_c.get_pixel(*x, *y))
+                    .collect::<Vec<_>>();
+                do_sort(&cli, &mut pixels[..]);
+
+                for ((idx_x, idx_y), px) in idxes.iter().zip(pixels.iter()) {
+                    rgba.put_pixel(*idx_x, *idx_y, **px);
+                }
+
+                prog.inc(1);
+            }
+        }
         PathShape::Line if cli.angle != 0.0 => {
             let tan = cli.angle.to_radians().tan();
             let extra_height = (w as f32 / tan).floor() as i64;
