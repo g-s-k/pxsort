@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use image::{DynamicImage, ImageError, Rgb};
+use image::{DynamicImage, ImageError, Rgba};
 use structopt::{
     clap::{_clap_count_exprs, arg_enum},
     StructOpt,
@@ -17,18 +17,18 @@ arg_enum! {
 }
 
 impl SortHeuristic {
-    fn func(&self) -> Box<Fn(&Rgb<u8>) -> u8> {
+    fn func(&self) -> Box<Fn(&Rgba<u8>) -> u8> {
         match self {
-            SortHeuristic::Red => Box::new(|Rgb { data, .. }| data[0]),
-            SortHeuristic::Green => Box::new(|Rgb { data, .. }| data[1]),
-            SortHeuristic::Blue => Box::new(|Rgb { data, .. }| data[2]),
-            SortHeuristic::Brightness => Box::new(|Rgb { data, .. }| {
+            SortHeuristic::Red => Box::new(|Rgba { data, .. }| data[0]),
+            SortHeuristic::Green => Box::new(|Rgba { data, .. }| data[1]),
+            SortHeuristic::Blue => Box::new(|Rgba { data, .. }| data[2]),
+            SortHeuristic::Brightness => Box::new(|Rgba { data, .. }| {
                 data[0] / 3
                     + data[1] / 3
                     + data[2] / 3
                     + (data[0] % 3 + data[1] % 3 + data[2] % 3) / 3
             }),
-            SortHeuristic::Luma => Box::new(|Rgb { data, .. }| {
+            SortHeuristic::Luma => Box::new(|Rgba { data, .. }| {
                 // https://stackoverflow.com/a/596241
                 ((data[0] as u16 * 2 + data[1] as u16 + data[2] as u16 * 4) >> 3) as u8
             }),
@@ -81,64 +81,63 @@ fn main() -> Result<(), ImageError> {
         img = img.rotate90();
     }
 
-    match &mut img {
-        DynamicImage::ImageRgb8(rgb) => {
-            let w = rgb.width() as usize;
-            for (idx_y, row) in rgb
-                .clone()
-                .pixels_mut()
-                .collect::<Vec<_>>()
-                .chunks_mut(w)
-                .enumerate()
-            {
-                let sort_fn = cli.function.func();
+    let mut rgba = img.to_rgba();
 
-                let mut ctr = 0;
-                while ctr < w {
-                    // find the end of the current "good" sequence
-                    let numel = row[ctr..]
-                        .iter()
-                        .take_while(|p| {
-                            let l = sort_fn(p);
-                            l >= cli.minimum && l <= cli.maximum
-                        })
-                        .count();
+    let w = rgba.width() as usize;
+    for (idx_y, row) in rgba
+        .clone()
+        .pixels_mut()
+        .collect::<Vec<_>>()
+        .chunks_mut(w)
+        .enumerate()
+    {
+        let sort_fn = cli.function.func();
 
-                    // sort
-                    row[ctr..ctr + numel].sort_unstable_by(|l, r| {
-                        if cli.reverse {
-                            sort_fn(r).cmp(&sort_fn(l))
-                        } else {
-                            sort_fn(l).cmp(&sort_fn(r))
-                        }
-                    });
+        let mut ctr = 0;
+        while ctr < w {
+            // find the end of the current "good" sequence
+            let numel = row[ctr..]
+                .iter()
+                .take_while(|p| {
+                    let l = sort_fn(p);
+                    l >= cli.minimum && l <= cli.maximum
+                })
+                .count();
 
-                    ctr += numel;
-
-                    // continue until another value in the right range appears
-                    ctr += row[ctr..]
-                        .iter()
-                        .take_while(|p| {
-                            let l = sort_fn(p);
-                            l < cli.minimum || l > cli.maximum
-                        })
-                        .count();
+            // sort
+            row[ctr..ctr + numel].sort_unstable_by(|l, r| {
+                if cli.reverse {
+                    sort_fn(r).cmp(&sort_fn(l))
+                } else {
+                    sort_fn(l).cmp(&sort_fn(r))
                 }
+            });
 
-                for (idx_x, px) in row.iter().enumerate() {
-                    rgb.put_pixel(idx_x as u32, idx_y as u32, **px);
-                }
-            }
+            ctr += numel;
+
+            // continue until another value in the right range appears
+            ctr += row[ctr..]
+                .iter()
+                .take_while(|p| {
+                    let l = sort_fn(p);
+                    l < cli.minimum || l > cli.maximum
+                })
+                .count();
         }
-        _ => (),
+
+        for (idx_x, px) in row.iter().enumerate() {
+            rgba.put_pixel(idx_x as u32, idx_y as u32, **px);
+        }
     }
 
+    let mut img_out = DynamicImage::ImageRgba8(rgba);
+
     if cli.vertical {
-        img = img.rotate270();
+        img_out = img_out.rotate270();
     }
 
     if let Some(p) = cli.output {
-        img.save(p)?;
+        img_out.save(p)?;
     } else {
         match (
             cli.file.parent(),
@@ -152,7 +151,7 @@ fn main() -> Result<(), ImageError> {
                 fname.push(e);
                 let mut pth = p.to_owned();
                 pth.push(fname);
-                img.save(pth)?;
+                img_out.save(pth)?;
             }
         }
     }
