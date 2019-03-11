@@ -67,6 +67,9 @@ struct Cli {
     /// Reverse the sort direction
     #[structopt(short)]
     reverse: bool,
+    /// Sort outside specified range rather than inside
+    #[structopt(short)]
+    invert: bool,
     /// Sort vertically instead of horizontally
     #[structopt(short)]
     vertical: bool,
@@ -100,7 +103,7 @@ fn main() -> Result<(), ImageError> {
                 .iter()
                 .take_while(|p| {
                     let l = sort_fn(p);
-                    l >= cli.minimum && l <= cli.maximum
+                    (l >= cli.minimum && l <= cli.maximum) != cli.invert
                 })
                 .count();
 
@@ -120,7 +123,7 @@ fn main() -> Result<(), ImageError> {
                 .iter()
                 .take_while(|p| {
                     let l = sort_fn(p);
-                    l < cli.minimum || l > cli.maximum
+                    (l < cli.minimum || l > cli.maximum) != cli.invert
                 })
                 .count();
         }
