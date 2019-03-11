@@ -118,6 +118,9 @@ struct Cli {
     /// Sort vertically instead of horizontally
     #[structopt(short)]
     vertical: bool,
+    /// Don't sort pixels that have zero alpha
+    #[structopt(long)]
+    mask_alpha: bool,
 }
 
 fn main() -> Result<(), ImageError> {
@@ -150,6 +153,7 @@ fn main() -> Result<(), ImageError> {
         .enumerate()
     {
         let sort_fn = cli.function.func();
+        let mask_fn = |p: &Rgba<u8>| !(cli.mask_alpha && p.data[3] == 0);
 
         let mut ctr = 0;
         while ctr < w as usize {
@@ -158,7 +162,7 @@ fn main() -> Result<(), ImageError> {
                 .iter()
                 .take_while(|p| {
                     let l = sort_fn(p);
-                    (l >= cli.minimum && l <= cli.maximum) != cli.invert
+                    (l >= cli.minimum && l <= cli.maximum) != cli.invert && mask_fn(p)
                 })
                 .count();
 
@@ -178,7 +182,7 @@ fn main() -> Result<(), ImageError> {
                 .iter()
                 .take_while(|p| {
                     let l = sort_fn(p);
-                    (l < cli.minimum || l > cli.maximum) != cli.invert
+                    (l < cli.minimum || l > cli.maximum) != cli.invert || !mask_fn(p)
                 })
                 .count();
         }
