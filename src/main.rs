@@ -216,7 +216,80 @@ fn main() -> Result<(), ImageError> {
     prog.set_style(ProgressStyle::default_bar().template("{prefix} {wide_bar} {pos:>4}/{len}"));
 
     match cli.path {
-        PathShape::Ellipse => unimplemented!(),
+        PathShape::Ellipse => {
+            let x_center = cli
+                .params
+                .iter()
+                .find(|s| s.starts_with("x="))
+                .map(|s| &s[2..])
+                .unwrap_or_default()
+                .parse::<f32>()
+                .unwrap_or(0.5);
+            let y_center = cli
+                .params
+                .iter()
+                .find(|s| s.starts_with("y="))
+                .map(|s| &s[2..])
+                .unwrap_or_default()
+                .parse::<f32>()
+                .unwrap_or(0.5);
+            let eccentricity = cli
+                .params
+                .iter()
+                .find(|s| s.starts_with("e="))
+                .map(|s| &s[2..])
+                .unwrap_or_default()
+                .parse::<f32>()
+                .unwrap_or_default();
+
+            let (c_x, c_y, diag) = (
+                (w as f32 * x_center).floor() as u32,
+                (h as f32 * y_center).floor() as u32,
+                (w as f32).hypot(h as f32).floor() as u32,
+            );
+
+            prog.set_prefix("Sorting rings:");
+            prog.set_length(diag as u64);
+            prog.set_draw_delta(diag as u64 / 50);
+
+            let rgba_c = rgba.clone();
+            for a in 1..diag {
+                let b = ((a as f32).powi(2) * (1. - eccentricity.powi(2))).sqrt();
+                let mut idxes = (0..36000)
+                    .into_iter()
+                    .map(|theta| {
+                        let t = theta as f32 / 100.;
+                        (
+                            a as f32 * b
+                                / ((b * t.to_radians().cos()).powi(2)
+                                    + (a as f32 * t.to_radians().sin()).powi(2))
+                                .sqrt(),
+                            t,
+                        )
+                    })
+                    .map(|(r, theta)| {
+                        (
+                            (r * theta.cos()).floor() + c_x as f32,
+                            (r * theta.sin()).floor() + c_y as f32,
+                        )
+                    })
+                    .filter(|(x, y)| *x > 0. && *x < w as f32 && *y > 0. && *y < h as f32)
+                    .map(|(x, y)| (x as u32, y as u32))
+                    .collect::<Vec<_>>();
+                idxes.dedup();
+                let mut pixels = idxes
+                    .iter()
+                    .map(|(x, y)| rgba_c.get_pixel(*x, *y))
+                    .collect::<Vec<_>>();
+                do_sort(&cli, &mut pixels[..]);
+
+                for ((idx_x, idx_y), px) in idxes.iter().zip(pixels.iter()) {
+                    rgba.put_pixel(*idx_x, *idx_y, **px);
+                }
+
+                prog.inc(1);
+            }
+        }
         PathShape::Sine => {
             let amplitude = cli
                 .params
@@ -251,9 +324,9 @@ fn main() -> Result<(), ImageError> {
                 0..(h as i64 - extra_height + BUFFER_PIXELS)
             };
 
-            prog.set_draw_delta((h as u64 + extra_height.abs() as u64) / 50);
             prog.set_prefix("Sorting rows:");
-            prog.tick();
+            prog.set_length(h as u64 + extra_height.abs() as u64);
+            prog.set_draw_delta((h as u64 + extra_height.abs() as u64) / 50);
 
             let rgba_c = rgba.clone();
             for row_idx in range {
@@ -291,9 +364,8 @@ fn main() -> Result<(), ImageError> {
                 0..(h as i64 - extra_height)
             };
 
-            prog.set_draw_delta((h as u64 + extra_height.abs() as u64) / 50);
             prog.set_prefix("Sorting rows:");
-            prog.tick();
+            prog.set_draw_delta((h as u64 + extra_height.abs() as u64) / 50);
 
             let rgba_c = rgba.clone();
             for row_idx in range {
