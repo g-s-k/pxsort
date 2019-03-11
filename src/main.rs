@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use image::{DynamicImage, ImageError, Rgba};
-use indicatif::ProgressBar;
+use indicatif::{ProgressBar, ProgressStyle};
 use structopt::{
     clap::{_clap_count_exprs, arg_enum},
     StructOpt,
@@ -133,9 +133,14 @@ fn main() -> Result<(), ImageError> {
     let mut rgba = img.to_rgba();
     let (w, h) = rgba.dimensions();
 
-    eprintln!("Sorting {}:", if cli.vertical { "columns" } else { "rows" });
     let prog = ProgressBar::new(h as u64);
     prog.set_draw_delta(h as u64 / 50);
+    prog.set_prefix(&format!(
+        "Sorting {}:",
+        if cli.vertical { "columns" } else { "rows" }
+    ));
+    prog.set_style(ProgressStyle::default_bar().template("{prefix} {wide_bar} {pos:>4}/{len}"));
+    prog.tick();
 
     for (idx_y, row) in rgba
         .clone()
