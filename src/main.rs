@@ -1,23 +1,69 @@
 use std::path::PathBuf;
 
 use image::{DynamicImage, ImageError, Rgb};
-use structopt::StructOpt;
+use structopt::{
+    clap::{_clap_count_exprs, arg_enum},
+    StructOpt,
+};
 
-#[derive(StructOpt)]
-struct Cli {
-    #[structopt(parse(try_from_str))]
-    file: PathBuf,
-    #[structopt(short, parse(try_from_str))]
-    output: Option<PathBuf>,
-    #[structopt(short, default_value = "0")]
-    minimum: u8,
-    #[structopt(short = "x", default_value = "255")]
-    maximum: u8,
+arg_enum! {
+    enum SortHeuristic {
+        Luma,
+        Brightness,
+        Red,
+        Blue,
+        Green,
+    }
 }
 
-fn luma(Rgb { data, .. }: &Rgb<u8>) -> u8 {
-    // https://stackoverflow.com/a/596241
-    ((data[0] as u16 * 2 + data[1] as u16 + data[2] as u16 * 4) >> 3) as u8
+impl SortHeuristic {
+    fn func(&self) -> Box<Fn(&Rgb<u8>) -> u8> {
+        match self {
+            SortHeuristic::Red => Box::new(|Rgb { data, .. }| data[0]),
+            SortHeuristic::Green => Box::new(|Rgb { data, .. }| data[1]),
+            SortHeuristic::Blue => Box::new(|Rgb { data, .. }| data[2]),
+            SortHeuristic::Brightness => Box::new(|Rgb { data, .. }| {
+                data[0] / 3
+                    + data[1] / 3
+                    + data[2] / 3
+                    + (data[0] % 3 + data[1] % 3 + data[2] % 3) / 3
+            }),
+            SortHeuristic::Luma => Box::new(|Rgb { data, .. }| {
+                // https://stackoverflow.com/a/596241
+                ((data[0] as u16 * 2 + data[1] as u16 + data[2] as u16 * 4) >> 3) as u8
+            }),
+        }
+    }
+}
+
+#[derive(StructOpt)]
+#[structopt(about = "Sort the pixels in an image")]
+#[structopt(raw(setting = "structopt::clap::AppSettings::ColoredHelp"))]
+#[structopt(rename_all = "kebab-case")]
+struct Cli {
+    /// Input file
+    #[structopt(parse(try_from_str))]
+    file: PathBuf,
+    /// Output file
+    #[structopt(short, parse(try_from_str))]
+    output: Option<PathBuf>,
+    /// Minimum value to sort
+    #[structopt(short, default_value = "0")]
+    minimum: u8,
+    /// Maximum value to sort
+    #[structopt(short = "x", default_value = "255")]
+    maximum: u8,
+    /// Sort heuristic to use
+    #[structopt(
+        short,
+        default_value = "luma",
+        raw(
+            possible_values = "&SortHeuristic::variants()",
+            case_insensitive = "true",
+            set = "structopt::clap::ArgSettings::NextLineHelp"
+        )
+    )]
+    function: SortHeuristic,
 }
 
 fn main() -> Result<(), ImageError> {
@@ -35,21 +81,23 @@ fn main() -> Result<(), ImageError> {
                 .chunks_mut(w)
                 .enumerate()
             {
+                let sort_fn = cli.function.func();
+
                 let mut ctr = 0;
                 while ctr < w {
                     let numel = row[ctr..]
                         .iter()
                         .take_while(|p| {
-                            let l = luma(p);
+                            let l = sort_fn(p);
                             l >= cli.minimum && l <= cli.maximum
                         })
                         .count();
-                    row[ctr..ctr + numel].sort_unstable_by(|left, right| luma(left).cmp(&luma(right)));
+                    row[ctr..ctr + numel].sort_unstable_by(|l, r| sort_fn(l).cmp(&sort_fn(r)));
                     ctr += numel;
                     ctr += row[ctr..]
                         .iter()
                         .take_while(|p| {
-                            let l = luma(p);
+                            let l = sort_fn(p);
                             l < cli.minimum || l > cli.maximum
                         })
                         .count();
