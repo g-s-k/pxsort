@@ -213,7 +213,7 @@ fn main() -> Result<(), ImageError> {
     let (w, h) = rgba.dimensions();
 
     let prog = ProgressBar::new(h as u64);
-    prog.set_style(ProgressStyle::default_bar().template("{prefix} {wide_bar} {pos:>4}/{len}"));
+    prog.set_style(ProgressStyle::default_bar().template("{prefix} {wide_bar} {pos:>5}/{len}"));
 
     match cli.path {
         PathShape::Ellipse => {
@@ -247,36 +247,33 @@ fn main() -> Result<(), ImageError> {
                 (h as f32 * y_center).floor() as u32,
                 (w as f32).hypot(h as f32).floor() as u32,
             );
+            let n_shells = diag * 10;
 
             prog.set_prefix("Sorting rings:");
-            prog.set_length(diag as u64);
-            prog.set_draw_delta(diag as u64 / 50);
+            prog.set_length(n_shells as u64);
+            prog.set_draw_delta(n_shells as u64 / 50);
+
+            let cos = cli.angle.to_radians().cos();
+            let sin = cli.angle.to_radians().sin();
 
             let rgba_c = rgba.clone();
-            for a in 1..diag {
-                let b = ((a as f32).powi(2) * (1. - eccentricity.powi(2))).sqrt();
-                let mut idxes = (0..36000)
+            for a in (0..n_shells).rev().into_iter().map(|da| (da as f32) / 5.) {
+                let b_sq = a.powi(2) * (1. - eccentricity.powi(2));
+                let c = (a.powi(2) - b_sq).sqrt();
+                let peri =
+                    (std::f32::consts::PI * 2. * ((a.powi(2) + b_sq) / 2.).sqrt()).floor() as usize;
+                let mut idxes = (0..peri)
                     .into_iter()
-                    .map(|theta| {
-                        let t = theta as f32 / 100.;
-                        (
-                            a as f32 * b
-                                / ((b * t.to_radians().cos()).powi(2)
-                                    + (a as f32 * t.to_radians().sin()).powi(2))
-                                .sqrt(),
-                            t,
-                        )
-                    })
-                    .map(|(r, theta)| {
-                        (
-                            (r * theta.cos()).floor() + c_x as f32,
-                            (r * theta.sin()).floor() + c_y as f32,
-                        )
-                    })
-                    .filter(|(x, y)| *x > 0. && *x < w as f32 && *y > 0. && *y < h as f32)
-                    .map(|(x, y)| (x as u32, y as u32))
+                    .map(|dt| ((dt as f32) * 360. / (peri as f32)).to_radians())
+                    .map(|theta| (b_sq / a / (1. - eccentricity * theta.cos()), theta))
+                    .map(|(r, theta)| (r * theta.cos() - c, r * theta.sin()))
+                    .map(|(x, y)| (x * cos - y * sin, y * cos + x * sin))
+                    .map(|(x, y)| (x + c_x as f32, y + c_y as f32))
+                    .filter(|(x, y)| *x >= 0. && *x < w as f32 && *y >= 0. && *y < h as f32)
+                    .map(|(x, y)| (x.floor() as u32, y.floor() as u32))
                     .collect::<Vec<_>>();
                 idxes.dedup();
+
                 let mut pixels = idxes
                     .iter()
                     .map(|(x, y)| rgba_c.get_pixel(*x, *y))
