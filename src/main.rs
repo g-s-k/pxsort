@@ -7,7 +7,9 @@ use structopt::{
     StructOpt,
 };
 
-const BUFFER_PIXELS: i64 = 100;
+mod path;
+
+use path::PathShape;
 
 fn pixel_max(Rgba { data, .. }: &Rgba<u8>) -> u8 {
     data[..3].iter().max().cloned().unwrap_or_default()
@@ -83,14 +85,6 @@ impl SortHeuristic {
     }
 }
 
-arg_enum! {
-    enum PathShape {
-        Line,
-        Sine,
-        Ellipse,
-    }
-}
-
 fn check_angle(angle: String) -> Result<(), String> {
     let ang = angle
         .parse::<f32>()
@@ -150,16 +144,9 @@ struct Cli {
         short,
         long,
         default_value = "line",
-        raw(
-            case_insensitive = "true",
-            possible_values = "&PathShape::variants()",
-            set = "structopt::clap::ArgSettings::NextLineHelp"
-        )
+        raw(set = "structopt::clap::ArgSettings::NextLineHelp")
     )]
     path: PathShape,
-    /// Parameters to modify the path
-    #[structopt(long)]
-    params: Vec<String>,
 }
 
 fn do_sort(cli: &Cli, pixels: &mut [&Rgba<u8>]) {
@@ -216,32 +203,10 @@ fn main() -> Result<(), ImageError> {
     prog.set_style(ProgressStyle::default_bar().template("{prefix} {wide_bar} {pos:>5}/{len}"));
 
     match cli.path {
-        PathShape::Ellipse => {
-            let x_center = cli
-                .params
-                .iter()
-                .find(|s| s.starts_with("x="))
-                .map(|s| &s[2..])
-                .unwrap_or_default()
-                .parse::<f32>()
-                .unwrap_or(0.5);
-            let y_center = cli
-                .params
-                .iter()
-                .find(|s| s.starts_with("y="))
-                .map(|s| &s[2..])
-                .unwrap_or_default()
-                .parse::<f32>()
-                .unwrap_or(0.5);
-            let eccentricity = cli
-                .params
-                .iter()
-                .find(|s| s.starts_with("e="))
-                .map(|s| &s[2..])
-                .unwrap_or_default()
-                .parse::<f32>()
-                .unwrap_or_default();
-
+        PathShape::Ellipse {
+            eccentricity,
+            center: (x_center, y_center),
+        } => {
             let (c_x, c_y, diag) = (
                 (w as f32 * x_center).floor() as u32,
                 (h as f32 * y_center).floor() as u32,
@@ -287,38 +252,17 @@ fn main() -> Result<(), ImageError> {
                 prog.inc(1);
             }
         }
-        PathShape::Sine => {
-            let amplitude = cli
-                .params
-                .iter()
-                .find(|s| s.starts_with("amp="))
-                .map(|s| &s[4..])
-                .unwrap_or_default()
-                .parse::<f32>()
-                .unwrap_or(50.);
-            let lambda = cli
-                .params
-                .iter()
-                .find(|s| s.starts_with("period="))
-                .map(|s| &s[7..])
-                .unwrap_or_default()
-                .parse::<f32>()
-                .unwrap_or(180. / std::f32::consts::PI);
-            let shift = cli
-                .params
-                .iter()
-                .find(|s| s.starts_with("offset="))
-                .map(|s| &s[7..])
-                .unwrap_or_default()
-                .parse::<f32>()
-                .unwrap_or_default();
-
+        PathShape::Sine {
+            amplitude,
+            lambda,
+            offset,
+        } => {
             let tan = cli.angle.to_radians().tan();
             let extra_height = (tan / w as f32).floor() as i64;
             let range = if extra_height > 0 {
-                -(extra_height + BUFFER_PIXELS)..(h as i64)
+                -(extra_height + amplitude.abs() as i64 * 2)..(h as i64 + amplitude.abs() as i64)
             } else {
-                0..(h as i64 + extra_height + BUFFER_PIXELS)
+                (-amplitude.abs() as i64)..(h as i64 + extra_height + amplitude.abs() as i64)
             };
 
             prog.set_prefix("Sorting rows:");
@@ -336,7 +280,8 @@ fn main() -> Result<(), ImageError> {
                     .map(|xv| {
                         (
                             xv,
-                            ((xv * tan + row_idx as f32) + (xv / lambda + shift).sin() * amplitude),
+                            ((xv * tan + row_idx as f32)
+                                + (xv / lambda + offset).sin() * amplitude),
                         )
                     })
                     .map(|(x, y)| (x * cos - y * sin, y * cos + x * sin))
@@ -356,7 +301,7 @@ fn main() -> Result<(), ImageError> {
                 prog.inc(1);
             }
         }
-        PathShape::Line if cli.angle != 0.0 => {
+        PathShape::Linear if cli.angle != 0.0 => {
             let tan = cli.angle.to_radians().tan();
             let extra_height = (tan / w as f32).floor() as i64;
             let range = if extra_height > 0 {
@@ -388,7 +333,7 @@ fn main() -> Result<(), ImageError> {
                 prog.inc(1);
             }
         }
-        PathShape::Line => {
+        PathShape::Linear => {
             prog.set_draw_delta(h as u64 / 50);
             prog.set_prefix(&format!(
                 "Sorting {}:",
