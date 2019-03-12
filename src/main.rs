@@ -314,30 +314,34 @@ fn main() -> Result<(), ImageError> {
                 .unwrap_or_default();
 
             let tan = cli.angle.to_radians().tan();
-            let extra_height = (w as f32 / tan).floor() as i64;
+            let extra_height = (tan / w as f32).floor() as i64;
             let range = if extra_height > 0 {
                 -(extra_height + BUFFER_PIXELS)..(h as i64)
             } else {
-                0..(h as i64 - extra_height + BUFFER_PIXELS)
+                0..(h as i64 + extra_height + BUFFER_PIXELS)
             };
 
             prog.set_prefix("Sorting rows:");
             prog.set_length(h as u64 + extra_height.abs() as u64);
             prog.set_draw_delta((h as u64 + extra_height.abs() as u64) / 50);
 
+            let cos = cli.angle.to_radians().cos();
+            let sin = cli.angle.to_radians().sin();
+
             let rgba_c = rgba.clone();
             for row_idx in range {
                 let idxes = (0..w)
                     .into_iter()
+                    .map(|x| x as f32)
                     .map(|xv| {
                         (
                             xv,
-                            ((xv as f32 * tan + row_idx as f32)
-                                + (xv as f32 / lambda + shift).sin() * amplitude)
-                                as u32,
+                            ((xv * tan + row_idx as f32) + (xv / lambda + shift).sin() * amplitude),
                         )
                     })
-                    .filter(|(_, y)| *y > 0 && *y < h)
+                    .map(|(x, y)| (x * cos - y * sin, y * cos + x * sin))
+                    .filter(|(x, y)| *x >= 0. && *x < w as f32 && *y >= 0. && *y < h as f32)
+                    .map(|(x, y)| (x.floor() as u32, y.floor() as u32))
                     .collect::<Vec<_>>();
                 let mut pixels = idxes
                     .iter()
@@ -354,7 +358,7 @@ fn main() -> Result<(), ImageError> {
         }
         PathShape::Line if cli.angle != 0.0 => {
             let tan = cli.angle.to_radians().tan();
-            let extra_height = (w as f32 / tan).floor() as i64;
+            let extra_height = (tan / w as f32).floor() as i64;
             let range = if extra_height > 0 {
                 -extra_height..(h as i64)
             } else {
