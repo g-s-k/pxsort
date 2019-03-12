@@ -212,7 +212,7 @@ fn main() -> Result<(), ImageError> {
                 (h as f32 * y_center).floor() as u32,
                 (w as f32).hypot(h as f32).floor() as u32,
             );
-            let n_shells = diag * 10;
+            let n_shells = diag * 5 * (1. + eccentricity).powi(2).floor() as u32;
 
             prog.set_prefix("Sorting rings:");
             prog.set_length(n_shells as u64);
@@ -227,9 +227,10 @@ fn main() -> Result<(), ImageError> {
                 let c = (a.powi(2) - b_sq).sqrt();
                 let peri =
                     (std::f32::consts::PI * 2. * ((a.powi(2) + b_sq) / 2.).sqrt()).floor() as usize;
-                let mut idxes = (0..peri)
+                let mut idxes = (0..peri * 3)
                     .into_iter()
-                    .map(|dt| ((dt as f32) * 360. / (peri as f32)).to_radians())
+                    .map(|dt| dt as f32 / 3.)
+                    .map(|dt| (dt * 360. / (peri as f32)).to_radians())
                     .map(|theta| (b_sq / a / (1. - eccentricity * theta.cos()), theta))
                     .map(|(r, theta)| (r * theta.cos() - c, r * theta.sin()))
                     .map(|(x, y)| (x * cos - y * sin, y * cos + x * sin))

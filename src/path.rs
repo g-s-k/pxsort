@@ -54,7 +54,7 @@ impl FromStr for PathShape {
         match s.trim() {
             "" | "line" | "linear" => Ok(PathShape::Linear),
             "sine" => Ok(DEFAULT_SINE),
-            "circle" => Ok(DEFAULT_ELL),
+            "circle" | "ellipse" => Ok(DEFAULT_ELL),
             st => {
                 let err_msg = format!("Could not parse `{}` as a valid path shape", st);
 
