@@ -377,7 +377,7 @@ dependencies = [
 
 [[package]]
 name = "pxsort"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "image 0.21.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "indicatif 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",

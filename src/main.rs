@@ -258,34 +258,28 @@ fn main() -> Result<(), ImageError> {
             lambda,
             offset,
         } => {
-            let tan = cli.angle.to_radians().tan();
-            let extra_height = (tan / w as f32).floor() as i64;
-            let range = if extra_height > 0 {
-                -(extra_height + amplitude.abs() as i64 * 2)..(h as i64 + amplitude.abs() as i64)
-            } else {
-                (-amplitude.abs() as i64)..(h as i64 + extra_height + amplitude.abs() as i64)
-            };
+            let (c_x, c_y, diag) = (
+                (w as f32 * 0.5).floor(),
+                (h as f32 * 0.5).floor(),
+                (w as f32).hypot(h as f32).floor() as u32,
+            );
 
             prog.set_prefix("Sorting rows:");
-            prog.set_length(h as u64 + extra_height.abs() as u64);
-            prog.set_draw_delta((h as u64 + extra_height.abs() as u64) / 50);
+            prog.set_length((h + diag) as u64 * 3);
+            prog.set_draw_delta((h + diag) as u64 * 3 / 50);
 
-            let cos = cli.angle.to_radians().cos();
-            let sin = cli.angle.to_radians().sin();
+            let ang = cli.angle.to_radians();
+            let (sin, cos) = (ang.sin(), ang.cos());
 
             let rgba_c = rgba.clone();
-            for row_idx in range {
-                let idxes = (0..w)
+            for row_idx in 0..(diag * 3) {
+                let idxes = (0..diag)
                     .into_iter()
                     .map(|x| x as f32)
-                    .map(|xv| {
-                        (
-                            xv,
-                            ((xv * tan + row_idx as f32)
-                                + (xv / lambda + offset).sin() * amplitude),
-                        )
-                    })
+                    .map(|x| (x, row_idx as f32 / 3. + (x / lambda + offset).sin() * amplitude))
+                    .map(|(x, y)| (x- diag as f32 / 2., y - diag as f32 / 2.))
                     .map(|(x, y)| (x * cos - y * sin, y * cos + x * sin))
+                    .map(|(x, y)| (x + c_x, y + c_y))
                     .filter(|(x, y)| *x >= 0. && *x < w as f32 && *y >= 0. && *y < h as f32)
                     .map(|(x, y)| (x.floor() as u32, y.floor() as u32))
                     .collect::<Vec<_>>();
