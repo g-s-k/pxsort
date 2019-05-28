@@ -298,7 +298,7 @@ fn main() -> Result<(), ImageError> {
         }
         PathShape::Linear if cli.angle != 0.0 => {
             let tan = cli.angle.to_radians().tan();
-            let extra_height = (tan / w as f32).floor() as i64;
+            let extra_height = (tan * w as f32).floor() as i64;
             let range = if extra_height > 0 {
                 -extra_height..(h as i64)
             } else {
