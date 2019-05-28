@@ -4,17 +4,18 @@ const DEFAULT_AMP: f32 = 25.0;
 const DEFAULT_LAMBDA: f32 = 50.0;
 const DEFAULT_CENTER: (f32, f32) = (0.5, 0.5);
 
-const DEFAULT_SINE: PathShape = PathShape::Sine {
+const DEFAULT_SINE: Shape = Shape::Sine {
     amplitude: DEFAULT_AMP,
     lambda: DEFAULT_LAMBDA,
     offset: 0.0,
 };
-const DEFAULT_ELL: PathShape = PathShape::Ellipse {
+const DEFAULT_ELL: Shape = Shape::Ellipse {
     eccentricity: 0.0,
     center: DEFAULT_CENTER,
 };
 
-pub enum PathShape {
+/// Path to follow through an image.
+pub enum Shape {
     Linear,
     Sine {
         amplitude: f32,
@@ -25,11 +26,13 @@ pub enum PathShape {
         eccentricity: f32,
         center: (f32, f32),
     },
+    #[doc(hidden)]
+    __Nonexhaustive,
 }
 
-impl Default for PathShape {
+impl Default for Shape {
     fn default() -> Self {
-        PathShape::Linear
+        Shape::Linear
     }
 }
 
@@ -47,12 +50,12 @@ fn unwrap_parens(s: &str) -> Result<&str, ()> {
     }
 }
 
-impl FromStr for PathShape {
+impl FromStr for Shape {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.trim() {
-            "" | "line" | "linear" => Ok(PathShape::Linear),
+            "" | "line" | "linear" => Ok(Shape::Linear),
             "sine" => Ok(DEFAULT_SINE),
             "circle" | "ellipse" => Ok(DEFAULT_ELL),
             st => {
@@ -67,17 +70,17 @@ impl FromStr for PathShape {
                         .map_err(|_| err_msg.clone())?;
                     match args.len() {
                         0 => Ok(DEFAULT_SINE),
-                        1 => Ok(PathShape::Sine {
+                        1 => Ok(Shape::Sine {
                             amplitude: args[0],
                             lambda: DEFAULT_LAMBDA,
                             offset: 0.0,
                         }),
-                        2 => Ok(PathShape::Sine {
+                        2 => Ok(Shape::Sine {
                             amplitude: args[0],
                             lambda: args[1],
                             offset: 0.0,
                         }),
-                        3 => Ok(PathShape::Sine {
+                        3 => Ok(Shape::Sine {
                             amplitude: args[0],
                             lambda: args[1],
                             offset: args[2],
@@ -93,7 +96,7 @@ impl FromStr for PathShape {
                         .map_err(|_| err_msg.clone())?;
                     match args.len() {
                         0 => Ok(DEFAULT_ELL),
-                        2 => Ok(PathShape::Ellipse {
+                        2 => Ok(Shape::Ellipse {
                             eccentricity: 0.0,
                             center: (args[0], args[1]),
                         }),
@@ -108,15 +111,15 @@ impl FromStr for PathShape {
                         .map_err(|_| err_msg.clone())?;
                     match args.len() {
                         0 => Ok(DEFAULT_ELL),
-                        1 => Ok(PathShape::Ellipse {
+                        1 => Ok(Shape::Ellipse {
                             eccentricity: args[0],
                             center: DEFAULT_CENTER,
                         }),
-                        2 => Ok(PathShape::Ellipse {
+                        2 => Ok(Shape::Ellipse {
                             eccentricity: 0.0,
                             center: (args[0], args[1]),
                         }),
-                        3 => Ok(PathShape::Ellipse {
+                        3 => Ok(Shape::Ellipse {
                             eccentricity: args[0],
                             center: (args[1], args[2]),
                         }),
