@@ -37,6 +37,11 @@ fieldset {
   margin-top: 0.5em;
 }
 
+fieldset label {
+  display: flex;
+  justify-content: space-between;
+}
+
 body > div.images {
   grid-column: 3;
   grid-row: 2;

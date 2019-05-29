@@ -245,7 +245,6 @@ impl Renderable<Root> for Root {
                 offset,
             } => html! {
                 <>
-                    <br />
                     <label>
                         {"Amplitude: "}
                         <input
@@ -256,7 +255,6 @@ impl Renderable<Root> for Root {
                             onchange=|c| Msg::ChangeSineAmplitude(c),
                         />
                     </label>
-                    <br />
                     <label>
                         {"Wavelength: "}
                         <input
@@ -267,7 +265,6 @@ impl Renderable<Root> for Root {
                             onchange=|c| Msg::ChangeSineLambda(c),
                         />
                     </label>
-                    <br />
                     <label>
                         {"Offset: "}
                         <input
@@ -285,7 +282,6 @@ impl Renderable<Root> for Root {
                 center: (cx, cy),
             } => html! {
                 <>
-                    <br />
                     <label>
                         {"Eccentricity: "}
                         <input
@@ -295,7 +291,6 @@ impl Renderable<Root> for Root {
                             onchange=|c| Msg::ChangeEllipseEccentricity(c),
                         />
                     </label>
-                    <br />
                     <label>
                         {"Center X: "}
                         <input
@@ -307,7 +302,6 @@ impl Renderable<Root> for Root {
                             onchange=|c| Msg::ChangeEllipseCenterX(c),
                         />
                     </label>
-                    <br />
                     <label>
                         {"Center Y: "}
                         <input
@@ -330,7 +324,7 @@ impl Renderable<Root> for Root {
                     <h1>{ "Pixel sorting" }</h1>
                     <h3>{ "(with Rust!)" }</h3>
                 </header>
-                <form class="controls", onsubmit="return false;", >
+                <form onsubmit="return false;", >
                     <label>
                         {"Upload a file: "}
                         <input
@@ -352,16 +346,14 @@ impl Renderable<Root> for Root {
                                 onchange=|c| Msg::ChangeAngle(c),
                             />
                         </label>
-                        <br />
                         <label>
+                            {"Rotate by an additional 90 degrees"}
                             <input
                                 type="checkbox",
                                 checked={self.cfg.vertical},
                                 onchange=|_| Msg::ToggleRotate,
                             />
-                            {"Rotate by an additional 90 degrees"}
                         </label>
-                        <br />
                         <section>
                             <label>
                                 {"Path shape: "}
@@ -384,27 +376,25 @@ impl Renderable<Root> for Root {
                                 })}
                             </select>
                         </label>
-                        <br />
                         <label>
+                            {"Reverse sort direction"}
                             <input
                                 type="checkbox",
                                 checked={self.cfg.reverse},
                                 onchange=|_| Msg::ToggleReverse,
                             />
-                            {"Reverse sort direction"}
                         </label>
                     </fieldset>
                     <fieldset>
                         <legend>{"Masking"}</legend>
                         <label>
+                            {"Exclude transparent pixels"}
                             <input
                                 type="checkbox",
                                 checked={self.cfg.mask_alpha},
                                 onchange=|_| Msg::ToggleAlpha,
                             />
-                            {"Exclude transparent pixels"}
                         </label>
-                        <br />
                         <label>
                             {"Minimum value: "}
                             <input
@@ -415,7 +405,6 @@ impl Renderable<Root> for Root {
                                 onchange=|c| Msg::ChangeMin(c),
                             />
                         </label>
-                        <br />
                         <label>
                             {"Maximum value: "}
                             <input
@@ -426,22 +415,34 @@ impl Renderable<Root> for Root {
                                 onchange=|c| Msg::ChangeMax(c),
                             />
                         </label>
-                        <br />
                         <label>
+                            {"Invert range"}
                             <input
                                 type="checkbox",
                                 checked={self.cfg.invert},
                                 onchange=|_| Msg::ToggleInvert,
                             />
-                            {"Invert range"}
                         </label>
                     </fieldset>
                     <br />
-                    <button onclick=|_| Msg::DoSort, >{"Sort some pixels!"}</button>
+                    <button onclick=|_| Msg::DoSort, disabled={self.input.is_none()}, >
+                        {"Sort some pixels!"}
+                    </button>
                 </form>
                 <div class="images", >
-                    <img src={self.input.as_ref().map(|(_, s, _)| s).unwrap_or(&"".to_string())}, />
-                    <img src={self.output.as_ref().unwrap_or(&"".to_string())}, />
+                    <img
+                        src={self.input.as_ref().map(|(_, s, _)| s).unwrap_or(&"".to_string())},
+                        alt="Upload an image to try pixel sorting!",
+                    />
+                    <br />
+                    <img
+                        src={self.output.as_ref().unwrap_or(&"".to_string())},
+                        alt={if self.input.is_some() {
+                            "Output image will appear here."
+                        } else {
+                            ""
+                        }},
+                    />
                 </div>
                 <footer>
                     { "\u{00A9} George Kaplan, 2019" }
