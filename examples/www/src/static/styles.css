@@ -25,6 +25,10 @@ body > .controls {
   grid-row: 2;
 }
 
+fieldset {
+  margin-top: 0.5em;
+}
+
 body > div.images {
   grid-column: 3;
   grid-row: 2;

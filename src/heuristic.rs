@@ -1,6 +1,6 @@
 use image::Rgba;
 use strum::IntoEnumIterator;
-use strum_macros::{EnumIter, EnumString, IntoStaticStr};
+use strum_macros::{Display, EnumIter, EnumString, IntoStaticStr};
 
 fn pixel_max(Rgba { data, .. }: &Rgba<u8>) -> u8 {
     data[..3].iter().max().cloned().unwrap_or_default()
@@ -49,7 +49,7 @@ fn pixel_luma(Rgba { data, .. }: &Rgba<u8>) -> u8 {
 
 /// Basis to use for sorting individual pixels.
 #[allow(non_camel_case_types)]
-#[derive(EnumIter, EnumString, IntoStaticStr)]
+#[derive(Clone, Copy, Display, EnumIter, EnumString, Eq, IntoStaticStr, PartialEq)]
 #[strum(serialize_all = "snake_case")]
 pub enum Heuristic {
     Luma,
@@ -69,17 +69,20 @@ pub enum Heuristic {
 
 impl Heuristic {
     /// Enumerate the available heuristics.
+    #[doc(hidden)]
     pub fn variants() -> Vec<&'static str> {
-        Self::iter()
-            .filter_map(|v| {
-                if let Heuristic::__Nonexhaustive = v {
-                    None
-                } else {
-                    Some(v)
-                }
-            })
-            .map(Into::into)
-            .collect()
+        Self::concrete_variants().map(Into::into).collect()
+    }
+
+    #[doc(hidden)]
+    pub fn concrete_variants() -> impl Iterator<Item = Self> {
+        Self::iter().filter_map(|v| {
+            if let Heuristic::__Nonexhaustive = v {
+                None
+            } else {
+                Some(v)
+            }
+        })
     }
 
     /// Get the key extraction function for this heuristic.
