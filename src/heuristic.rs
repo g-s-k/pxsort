@@ -68,7 +68,8 @@ pub enum Heuristic {
 }
 
 impl Heuristic {
-    pub(crate) fn variants() -> Vec<&'static str> {
+    /// Enumerate the available heuristics.
+    pub fn variants() -> Vec<&'static str> {
         Self::iter()
             .filter_map(|v| {
                 if let Heuristic::__Nonexhaustive = v {

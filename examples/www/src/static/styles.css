@@ -1,0 +1,42 @@
+html, body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  display: grid;
+  grid-template-columns: 2em 25em auto 2em;
+  grid-template-rows: 10em auto 3em;
+}
+
+header, footer {
+  grid-column: 1 / 5;
+}
+
+header {
+  grid-row: 1;
+  text-align: center;
+}
+
+body > .controls {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+body > div.images {
+  grid-column: 3;
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+}
+
+body > div.images > img {
+  flex: 1;
+}
+
+
+footer {
+  grid-row: 3;
+}
