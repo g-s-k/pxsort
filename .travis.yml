@@ -28,4 +28,4 @@ jobs:
           branch: master
     - stage: lint
       before_script: rustup component add clippy
-script: cargo clippy -- -D warnings
+      script: cargo clippy -- -D warnings
