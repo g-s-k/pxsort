@@ -1,4 +1,5 @@
 //! Sort pixels in an image.
+#![warn(clippy::pedantic)]
 
 use image::{DynamicImage, Rgba};
 #[cfg(not(target_arch = "wasm32"))]
@@ -11,6 +12,7 @@ mod path;
 pub use heuristic::Heuristic;
 pub use path::Shape;
 
+#[allow(clippy::needless_pass_by_value)]
 fn check_angle(angle: String) -> Result<(), String> {
     let ang = angle
         .parse::<f32>()
@@ -128,6 +130,11 @@ impl Config {
         }
     }
 
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_precision_loss,
+        clippy::cast_sign_loss
+    )]
     /// Sort pixels according to configured settings and return a new image.
     pub fn sort(&self, mut img: DynamicImage) -> DynamicImage {
         if self.vertical {
@@ -139,7 +146,7 @@ impl Config {
 
         #[cfg(not(target_arch = "wasm32"))]
         let prog = {
-            let p = ProgressBar::new(h as u64);
+            let p = ProgressBar::new(u64::from(h));
             p.set_style(
                 ProgressStyle::default_bar().template("{prefix} {wide_bar} {pos:>5}/{len}"),
             );
@@ -161,29 +168,33 @@ impl Config {
                 #[cfg(not(target_arch = "wasm32"))]
                 {
                     prog.set_prefix("Sorting rings:");
-                    prog.set_length(n_shells as u64);
-                    prog.set_draw_delta(n_shells as u64 / 50);
+                    prog.set_length(u64::from(n_shells));
+                    prog.set_draw_delta(u64::from(n_shells) / 50);
                 }
 
                 let cos = self.angle.to_radians().cos();
                 let sin = self.angle.to_radians().sin();
 
                 let rgba_c = rgba.clone();
-                for a in (0..n_shells).rev().into_iter().map(|da| (da as f32) / 5.) {
+                for a in (0..n_shells).rev().map(|da| (da as f32) / 5.) {
                     let b_sq = a.powi(2) * (1. - eccentricity.powi(2));
                     let c = (a.powi(2) - b_sq).sqrt();
                     let peri = (std::f32::consts::PI * 2. * ((a.powi(2) + b_sq) / 2.).sqrt())
                         .floor() as usize;
                     let mut idxes = (0..peri * 3)
-                        .into_iter()
                         .map(|dt| dt as f32 / 3.)
                         .map(|dt| (dt * 360. / (peri as f32)).to_radians())
                         .map(|theta| (b_sq / a / (1. - eccentricity * theta.cos()), theta))
                         .map(|(r, theta)| (r * theta.cos() - c, r * theta.sin()))
                         .map(|(x, y)| (x * cos - y * sin, y * cos + x * sin))
                         .map(|(x, y)| (x + c_x as f32, y + c_y as f32))
-                        .filter(|(x, y)| *x >= 0. && *x < w as f32 && *y >= 0. && *y < h as f32)
-                        .map(|(x, y)| (x.floor() as u32, y.floor() as u32))
+                        .filter_map(|(x, y)| {
+                            if x >= 0. && x < w as f32 && y >= 0. && y < h as f32 {
+                                Some((x.floor() as u32, y.floor() as u32))
+                            } else {
+                                None
+                            }
+                        })
                         .collect::<Vec<_>>();
                     idxes.dedup();
 
@@ -215,8 +226,8 @@ impl Config {
                 #[cfg(not(target_arch = "wasm32"))]
                 {
                     prog.set_prefix("Sorting rows:");
-                    prog.set_length((h + diag) as u64 * 3);
-                    prog.set_draw_delta((h + diag) as u64 * 3 / 50);
+                    prog.set_length(u64::from(h + diag) * 3);
+                    prog.set_draw_delta(u64::from(h + diag) * 3 / 50);
                 }
 
                 let ang = self.angle.to_radians();
@@ -225,7 +236,6 @@ impl Config {
                 let rgba_c = rgba.clone();
                 for row_idx in 0..(diag * 3) {
                     let idxes = (0..diag)
-                        .into_iter()
                         .map(|x| x as f32)
                         .map(|x| {
                             (
@@ -236,8 +246,13 @@ impl Config {
                         .map(|(x, y)| (x - diag as f32 / 2., y - diag as f32 / 2.))
                         .map(|(x, y)| (x * cos - y * sin, y * cos + x * sin))
                         .map(|(x, y)| (x + c_x, y + c_y))
-                        .filter(|(x, y)| *x >= 0. && *x < w as f32 && *y >= 0. && *y < h as f32)
-                        .map(|(x, y)| (x.floor() as u32, y.floor() as u32))
+                        .filter_map(|(x, y)| {
+                            if x >= 0. && x < w as f32 && y >= 0. && y < h as f32 {
+                                Some((x.floor() as u32, y.floor() as u32))
+                            } else {
+                                None
+                            }
+                        })
                         .collect::<Vec<_>>();
                     let mut pixels = idxes
                         .iter()
@@ -257,21 +272,20 @@ impl Config {
                 let tan = self.angle.to_radians().tan();
                 let extra_height = (tan * w as f32).floor() as i64;
                 let range = if extra_height > 0 {
-                    -extra_height..(h as i64)
+                    -extra_height..i64::from(h)
                 } else {
-                    0..(h as i64 - extra_height)
+                    0..(i64::from(h) - extra_height)
                 };
 
                 #[cfg(not(target_arch = "wasm32"))]
                 {
                     prog.set_prefix("Sorting rows:");
-                    prog.set_draw_delta((h as u64 + extra_height.abs() as u64) / 50);
+                    prog.set_draw_delta((u64::from(h) + extra_height.abs() as u64) / 50);
                 }
 
                 let rgba_c = rgba.clone();
                 for row_idx in range {
                     let idxes = (0..w)
-                        .into_iter()
                         .map(|xv| (xv, (xv as f32 * tan + row_idx as f32) as u32))
                         .filter(|(_, y)| *y > 0 && *y < h)
                         .collect::<Vec<_>>();
@@ -292,7 +306,7 @@ impl Config {
             Shape::Linear => {
                 #[cfg(not(target_arch = "wasm32"))]
                 {
-                    prog.set_draw_delta(h as u64 / 50);
+                    prog.set_draw_delta(u64::from(h) / 50);
                     prog.set_prefix(&format!(
                         "Sorting {}:",
                         if self.vertical { "columns" } else { "rows" }
