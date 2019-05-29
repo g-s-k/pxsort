@@ -9,7 +9,7 @@ repository = "https://github.com/g-s-k/pxsort"
 readme = "./README.md"
 
 [dependencies]
-image = "0.21.0"
+image = { version = "0.21.1", default-features = false, features = ["gif_codec", "jpeg", "ico", "png_codec", "pnm", "tga", "tiff", "webp", "bmp", "hdr", "dxt"] }
 strum = "0.15.0"
 structopt = "0.2.15"
 strum_macros = "0.15.0"

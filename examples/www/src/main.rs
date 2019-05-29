@@ -1,5 +1,6 @@
 #![recursion_limit = "2048"]
 
+use image::{ImageFormat, ImageOutputFormat};
 use pxsort::{Config, Heuristic, Shape};
 use yew::{
     html,
@@ -18,7 +19,7 @@ struct Root {
     reader: ReaderService,
     tasks: Vec<ReaderTask>,
     cfg: Config,
-    input: Option<(FileData, String)>,
+    input: Option<(FileData, String, String)>,
     output: Option<String>,
 }
 
@@ -79,16 +80,32 @@ impl Component for Root {
             }
             Msg::LoadedFile(fd, mime) => {
                 let c = base64::encode(&fd.content);
-                self.input = Some((fd, format!("data:{};base64,{}", mime, c)));
+                self.input = Some((
+                    fd,
+                    format!("data:{};base64,{}", &mime, c),
+                    mime[6..].to_string(),
+                ));
             }
             Msg::DoSort => {
-                if let Some((fd, _)) = &self.input {
-                    if let Ok(img) = image::load_from_memory(&fd.content) {
+                if let Some((fd, _, ext)) = &self.input {
+                    if let Ok(img) = match ext.as_ref() {
+                        "bmp" => Some(ImageFormat::BMP),
+                        "gif" => Some(ImageFormat::GIF),
+                        "jpg" | "jpeg" => Some(ImageFormat::JPEG),
+                        "png" => Some(ImageFormat::PNG),
+                        "tif" | "tiff" => Some(ImageFormat::TIFF),
+                        "webp" => Some(ImageFormat::WEBP),
+                        _ => None,
+                    }
+                    .map_or_else(
+                        || image::load_from_memory(&fd.content),
+                        |fmt| image::load_from_memory_with_format(&fd.content, fmt),
+                    ) {
                         let mut buffer = Vec::new();
                         if let Ok(()) = self
                             .cfg
                             .sort(img)
-                            .write_to(&mut buffer, image::ImageOutputFormat::PNG)
+                            .write_to(&mut buffer, ImageOutputFormat::PNG)
                         {
                             self.output =
                                 Some(format!("data:image/png;base64,{}", base64::encode(&buffer)));
@@ -420,7 +437,7 @@ impl Renderable<Root> for Root {
                     <button onclick=|_| Msg::DoSort, >{"Sort some pixels!"}</button>
                 </form>
                 <div class="images", >
-                    <img src={self.input.as_ref().map(|(_, s)| s).unwrap_or(&"".to_string())}, />
+                    <img src={self.input.as_ref().map(|(_, s, _)| s).unwrap_or(&"".to_string())}, />
                     <img src={self.output.as_ref().unwrap_or(&"".to_string())}, />
                 </div>
                 <footer />
