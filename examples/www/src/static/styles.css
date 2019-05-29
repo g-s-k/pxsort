@@ -32,12 +32,12 @@ fieldset {
 body > div.images {
   grid-column: 3;
   grid-row: 2;
-  display: flex;
-  flex-direction: column;
+  overflow: hidden;
 }
 
 body > div.images > img {
-  flex: 1;
+  max-height: 50%;
+  max-width: 100%;
 }
 
 
