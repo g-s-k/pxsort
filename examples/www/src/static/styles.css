@@ -1,29 +1,34 @@
+html {
+  background: rgba(0, 0, 0, 0.3);
+}
+
 html, body {
   width: 100%;
   height: 100%;
   margin: 0;
-  overflow: hidden;
 }
 
 body {
   display: grid;
   grid-template-columns: 2em 25em auto 2em;
-  grid-template-rows: 10em auto 3em;
+  grid-template-rows: 10em auto 4em;
   font-family: Helvetica, Arial, sans-serif;
   color: snow;
-  background-image: linear-gradient(45deg, #000008, #333633);
+  background: linear-gradient(127deg, rgba(0, 0, 127, 0.8), rgba(0, 0, 127, 0) 70.71%),
+              linear-gradient(217deg, rgba(0, 127, 0, 0.8), rgba(0, 127, 0, 0) 70.71%),
+              linear-gradient(336deg, rgba(127, 0, 0, 0.8), rgba(127, 0, 0, 0) 70.71%);;
 }
 
 header, footer {
   grid-column: 1 / 5;
+  text-align: center;
 }
 
 header {
   grid-row: 1;
-  text-align: center;
 }
 
-body > .controls {
+form {
   grid-column: 2;
   grid-row: 2;
 }

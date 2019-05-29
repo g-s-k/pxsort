@@ -326,7 +326,10 @@ impl Renderable<Root> for Root {
 
         html! {
             <>
-                <header>{ "Pixel sort" }</header>
+                <header>
+                    <h1>{ "Pixel sorting" }</h1>
+                    <h3>{ "(with Rust!)" }</h3>
+                </header>
                 <form class="controls", onsubmit="return false;", >
                     <label>
                         {"Upload a file: "}
@@ -440,7 +443,13 @@ impl Renderable<Root> for Root {
                     <img src={self.input.as_ref().map(|(_, s, _)| s).unwrap_or(&"".to_string())}, />
                     <img src={self.output.as_ref().unwrap_or(&"".to_string())}, />
                 </div>
-                <footer />
+                <footer>
+                    { "\u{00A9} George Kaplan, 2019" }
+                    <br />
+                    { "The source for this site is available " }
+                    <a href="https://github.com/g-s-k/pxsort",>{ "on GitHub" }</a>
+                    { "." }
+                </footer>
             </>
         }
     }
