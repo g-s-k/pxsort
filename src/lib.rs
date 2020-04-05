@@ -133,8 +133,10 @@ impl Config {
     #[allow(
         clippy::cast_possible_truncation,
         clippy::cast_precision_loss,
-        clippy::cast_sign_loss
+        clippy::cast_sign_loss,
+        clippy::too_many_lines
     )]
+    #[must_use]
     /// Sort pixels according to configured settings and return a new image.
     pub fn sort(&self, mut img: DynamicImage) -> DynamicImage {
         if self.vertical {

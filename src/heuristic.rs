@@ -81,6 +81,7 @@ pub enum Heuristic {
 impl Heuristic {
     /// Enumerate the available heuristics.
     #[doc(hidden)]
+    #[must_use]
     pub fn variants() -> Vec<&'static str> {
         Self::concrete_variants().map(Into::into).collect()
     }
@@ -91,6 +92,7 @@ impl Heuristic {
     }
 
     /// Get the key extraction function for this heuristic.
+    #[must_use]
     pub fn func(self) -> Box<dyn Fn(&Rgba<u8>) -> u8> {
         match self {
             Heuristic::Red => Box::new(|Rgba { data, .. }| data[0]),
