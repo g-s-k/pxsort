@@ -91,7 +91,7 @@ impl Heuristic {
     }
 
     /// Get the key extraction function for this heuristic.
-    pub fn func(self) -> Box<Fn(&Rgba<u8>) -> u8> {
+    pub fn func(self) -> Box<dyn Fn(&Rgba<u8>) -> u8> {
         match self {
             Heuristic::Red => Box::new(|Rgba { data, .. }| data[0]),
             Heuristic::Green => Box::new(|Rgba { data, .. }| data[1]),
