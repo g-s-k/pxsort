@@ -21,5 +21,12 @@ jobs:
       with:
         crate: cargo-web
         version: latest
+        use-tool-cache: true
     - name: Build
       run: cargo web deploy --package www --release
+    - name: Deploy
+      if: github.ref == 'master'
+      uses: ad-m/github-push-action@0.5.0
+      with:
+        branch: gh-pages
+        github_token: ${{ github.token }}
