@@ -21,7 +21,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Install
-      run: type -fq cargo-web || cargo install cargo-web
+    - uses: actions-rs/install@v0.1
+      with:
+        crate: cargo-web
+        version: latest
     - name: Build
       run: cargo web deploy --package www --release
