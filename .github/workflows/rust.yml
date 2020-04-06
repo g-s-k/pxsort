@@ -30,4 +30,5 @@ jobs:
       with:
         directory: 'target/deploy'
         branch: gh-pages
+        force: true
         github_token: ${{ github.token }}
